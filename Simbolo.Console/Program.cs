@@ -20,7 +20,10 @@ class Program
         catch (Exception e)
         {
             var info = Client.GetStackTraceInformation(e);
-            Console.WriteLine(info);
+            Console.WriteLine("Custom:");
+            Console.WriteLine(info.ToString());
+            Console.WriteLine("Original:");
+            Console.WriteLine(e.StackTrace);
             
             var path = typeof(Program).Assembly.Location;
             foreach (var frame in new StackTrace(e, true).GetFrames())

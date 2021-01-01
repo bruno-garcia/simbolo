@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Text;
+using System.Text.Json;
 
 namespace Simbolo
 {
@@ -15,18 +18,23 @@ namespace Simbolo
             var stackTrace = new StackTrace(exception, true);
             if (stackTrace.FrameCount == 0)
             {
-                return new StackTraceInformation(Enumerable.Empty<StackFrameInformation>());
+                return new StackTraceInformation();
             }
 
             var frames = new List<StackFrameInformation>();
+            var debugMetas = new List<DebugMeta>();
             foreach (var stackFrame in stackTrace.GetFrames())
             {
-                frames.Add(GetFrameInformation(stackFrame));
+                var frame = GetFrameInformation(stackFrame);
+                frames.Add(frame);
+
+                if (frame.LineNumber == null && GetDebugMeta(stackFrame) is { } debugMeta)
+                {
+                    debugMetas.Add(debugMeta);
+                }
             }
 
-            // TODO:
-            IEnumerable<DebugMeta>? debugMeta = null; 
-            return new StackTraceInformation(frames, debugMeta);
+            return new StackTraceInformation(frames, debugMetas);
         }
 
         private static StackFrameInformation GetFrameInformation(StackFrame stackFrame)
@@ -41,8 +49,17 @@ namespace Simbolo
                 ", ",
                 method.GetParameters().Select(p => $"{p.ParameterType.Name} {p.Name}")
             );
-
-            var methodSignature = $"{method.Name}({parameterListFormatted})";
+            List<Parameter>? parameters = null;
+            foreach (var parameterInfo in method.GetParameters())
+            {
+                parameters ??= new List<Parameter>();
+                var param = new Parameter
+                {
+                    TypeName = parameterInfo.ParameterType.Name,
+                    Name = parameterInfo.Name,
+                };
+                parameters.Add(param);
+            }
 
             // stackFrame.HasILOffset() throws NotImplemented on Mono 5.12
             var offset = stackFrame.GetILOffset();
@@ -71,40 +88,89 @@ namespace Simbolo
                 MethodIndex = method.MetadataToken,
                 Offset = offset,
                 IsILOffset = isIlOffset,
-                Method = methodSignature,
+                Method = method.Name,
+                Parameters = parameters,
                 LineNumber = lineNumber,
                 ColumnNumber = columnNumber,
-                TypeFullName = method.DeclaringType?.FullName,
-                AssemblyFullName = method.DeclaringType?.Assembly.FullName
+                AssemblyFullName = method.DeclaringType?.Assembly.FullName,
+                TypeFullName = method.DeclaringType?.FullName
             };
         }
 
-        internal static DebugMeta GetDebugMeta(PEReader peReader)
-        {
-            var checksums = new List<string>();
+        private static readonly ConcurrentDictionary<string, DebugMeta> Cache = new();
+        private static readonly DebugMeta Empty = new("", Guid.Empty, "", Guid.Empty, 0, null);
 
-            var pdbChecksum = peReader.ReadDebugDirectory()
-                .FirstOrDefault(d => d.Type == DebugDirectoryEntryType.PdbChecksum);
-            var checksumData = peReader.ReadPdbChecksumDebugDirectoryData(pdbChecksum);
-            var algorithm = checksumData.AlgorithmName;
-            var builder = new StringBuilder();
-            builder.Append(algorithm);
-            builder.Append(':');
-            foreach (var bytes in checksumData.Checksum)
+        private static DebugMeta? GetDebugMeta(StackFrame frame)
+        {
+            var asm = frame.GetMethod()?.DeclaringType?.Assembly;
+            var location = asm?.Location;
+            if (location is null)
             {
-                builder.Append(bytes.ToString("x2"));
+                // TODO: Logging
+                return null;
+            }
+            if (Cache.TryGetValue(location, out var cachedDebugMeta))
+            {
+                return cachedDebugMeta == Empty ? null : cachedDebugMeta;
             }
 
-            checksums.Add(builder.ToString());
+            lock (asm!) // We bail if asm or location is null
+            {
+                try
+                {
+                    if (!File.Exists(location))
+                    {
+                        // TODO: Logging
+                        return null;
+                    }
 
+                    using var stream = File.OpenRead(location);
+                    var reader = new PEReader(stream);
+                    var debugMeta = GetDebugMeta(reader);
+                    Cache.TryAdd(location, debugMeta ?? Empty);
+                    return debugMeta;
+                }
+                catch
+                {
+                    Cache.TryAdd(location, Empty);
+                    throw;
+                }
+            }
+        }
+
+        private static DebugMeta? GetDebugMeta(PEReader peReader)
+        {
             var codeView = peReader.ReadDebugDirectory()
                 .FirstOrDefault(d => d.Type == DebugDirectoryEntryType.CodeView);
+            if (codeView.Type == DebugDirectoryEntryType.Unknown)
+            {
+                return null;
+            }
+            
+            // Framework's assemblies don't have pdb checksum. I.e: System.Private.CoreLib.pdb
+            IEnumerable<string>? checksums = null;
+            var pdbChecksum = peReader.ReadDebugDirectory()
+                .FirstOrDefault(d => d.Type == DebugDirectoryEntryType.PdbChecksum);
+            if (pdbChecksum.Type != DebugDirectoryEntryType.Unknown)
+            {
+    
+                var checksumData = peReader.ReadPdbChecksumDebugDirectoryData(pdbChecksum);
+                var algorithm = checksumData.AlgorithmName;
+                var builder = new StringBuilder();
+                builder.Append(algorithm);
+                builder.Append(':');
+                foreach (var bytes in checksumData.Checksum)
+                {
+                    builder.Append(bytes.ToString("x2"));
+                }
+                checksums = new[] {builder.ToString()};
+            }
+
 
             var data = peReader.ReadCodeViewDebugDirectoryData(codeView);
-            const ushort portableCodeViewVersionMagic = 0x504d;
-            var isPortable = codeView.MinorVersion == portableCodeViewVersionMagic;
+            var isPortable = codeView.IsPortableCodeView;
 
-            var signature = data.Guid;
+            var signature = data.Guid; // TODO: Always the same as mvid??
             var age = data.Age;
             var file = data.Path;
 
@@ -122,21 +188,98 @@ namespace Simbolo
     public class StackTraceInformation
     {
         public IEnumerable<StackFrameInformation> StackFrameInformation { get; }
-        public IEnumerable<DebugMeta>? DebugMetas { get; set; }
+        public IEnumerable<DebugMeta> DebugMetas { get; }
 
         public StackTraceInformation(
             IEnumerable<StackFrameInformation> stackFrameInformation,
-            // Null if the stack trace is already complete
-            IEnumerable<DebugMeta>? debugMetas = null)
+            IEnumerable<DebugMeta> debugMetas)
         {
             StackFrameInformation = stackFrameInformation;
             DebugMetas = debugMetas;
         }
-
-        public override string ToString()
+        
+        internal StackTraceInformation()
         {
-            return $"{nameof(StackFrameInformation)}: {string.Join(Environment.NewLine, StackFrameInformation)}, " +
-                   $"{nameof(DebugMetas)}: {(DebugMetas != null ? string.Join(Environment.NewLine, DebugMetas) : "None")}";
+            StackFrameInformation = Enumerable.Empty<StackFrameInformation>();
+            DebugMetas = Enumerable.Empty<DebugMeta>();
+        }
+
+        public override string ToString() => ToString("default");
+
+        public string ToString(string format) =>
+            format switch
+            {
+                "json" => JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }),
+                _ => ToStringDotnet(),
+            };
+
+        private string ToStringDotnet()
+        {
+            var builder = new StringBuilder();
+            foreach (var info in StackFrameInformation)
+            {
+                if (info.Method is null)
+                {
+                    continue;
+                }
+
+                builder.Append("   at ");
+                if (info.TypeFullName is not null)
+                {
+                    builder.Append(info.TypeFullName);
+                    builder.Append('.');
+                } 
+                builder.Append(info.Method);
+                if (info.Parameters is null || !info.Parameters.Any())
+                {
+                    builder.Append("()");
+                }
+                else
+                {
+                    builder.Append('(');
+                    foreach (var arg in info.Parameters)
+                    {
+                        builder.Append(arg.TypeName);
+                        builder.Append(' ');
+                        builder.Append(arg.Name);
+                    }
+                    builder.Append(')');
+                }
+                if (info.FileName is not null)
+                {
+                    builder.Append(" in ");
+                    builder.Append(info.FileName);
+                } 
+                else if (info.Mvid is not null)
+                {
+                    builder.Append(" in ");
+                    // Mono format
+                    builder.Append('<');
+                    builder.Append(info.FileName);
+                    if (info.Aotid is not null)
+                    {
+                        builder.Append('#');
+                        builder.Append(info.Aotid);
+                    }
+                    builder.Append('>');
+                }
+
+                if (info.LineNumber is not null)
+                {
+                    builder.Append(":line ");
+                    builder.Append(info.LineNumber);
+                }
+
+                if (info.ColumnNumber is not null)
+                {
+                    builder.Append(':');
+                    builder.Append(info.ColumnNumber);
+                }
+
+                builder.AppendLine();
+            }
+
+            return builder.ToString();
         }
     }
 
@@ -153,6 +296,7 @@ namespace Simbolo
         public string? TypeFullName { get; init; }
         public int? LineNumber { get; init; }
         public int? ColumnNumber { get; init; }
+        public IEnumerable<Parameter>? Parameters { get; init; }
 
         public override string ToString() =>
             $"{nameof(MethodIndex)}: {MethodIndex}, " +
@@ -165,12 +309,18 @@ namespace Simbolo
             $"{nameof(AssemblyFullName)}: {AssemblyFullName}, " +
             $"{nameof(TypeFullName)}: {TypeFullName}, " +
             $"{nameof(LineNumber)}: {LineNumber}, " +
-            $"{nameof(ColumnNumber)}: {ColumnNumber}";
+            $"{nameof(ColumnNumber)}: {ColumnNumber}, " +
+            $"{nameof(Parameters)}: {string.Join(", ", Parameters ?? Enumerable.Empty<Parameter>())}";
     }
-    
+
+    public class Parameter
+    {
+        public string? TypeName { get; init; }
+        public string? Name { get; init; }
+    }
     public class DebugMeta
     {
-        public DebugMeta(string file, Guid moduleId, string type, Guid guid, int age, IReadOnlyList<string> checksums)
+        public DebugMeta(string file, Guid moduleId, string type, Guid guid, int age, IEnumerable<string>? checksums)
         {
             File = file;
             ModuleId = moduleId;
@@ -186,15 +336,15 @@ namespace Simbolo
         public string Type { get; }
         public Guid Guid { get; }
         public int Age { get; }
-        public IReadOnlyList<string> Checksums { get; init; }
+        public IEnumerable<string>? Checksums { get; init; }
 
         public override string ToString() =>
-            $"{nameof(File)}: {File}" +
+            $"{nameof(File)}: {File}, " +
             $"{nameof(ModuleId)}: {ModuleId}, " +
             $"{nameof(IsPortable)}: {IsPortable}, " +
             $"{nameof(Type)}: {Type}, " +
             $"{nameof(Guid)}: {Guid}, " +
             $"{nameof(Age)}: {Age}, " +
-            $"{nameof(Checksums)}: {Environment.NewLine}{string.Join(Environment.NewLine, Checksums)}";
+            $"{nameof(Checksums)}: {Environment.NewLine}{string.Join(Environment.NewLine, Checksums ?? Enumerable.Empty<string>())}";
     }
 }
