@@ -9,6 +9,10 @@ namespace Simbolo.NativeLib
         public static IntPtr SymbolicateFrame(IntPtr symbolsPath, NativeFrameInfo nativeFrameInfo)
         {
             var path = Marshal.PtrToStringAnsi(symbolsPath);
+            if (path is null)
+            {
+                throw new InvalidOperationException("Couldn't get the path from the native pointer");
+            }
             var frameInfo = nativeFrameInfo.ToFrameInfo();
 
             var location = Symbolicate.SymbolicateFrame(path, frameInfo);
@@ -35,12 +39,20 @@ namespace Simbolo.NativeLib
         public IntPtr Method { get; }
         public int ILOffset { get; }
 
-        public FrameInfo ToFrameInfo() => new FrameInfo
+        public FrameInfo ToFrameInfo()
         {
-            Method = Marshal.PtrToStringAnsi(Method),
-            Mvid = new Guid(Marshal.PtrToStringAnsi(Mvid)),
-            ILOffset = ILOffset
-        };
+            var mvid = Marshal.PtrToStringAnsi(Mvid);
+            if (mvid is null)
+            {
+                throw new InvalidOperationException("Failed to the native pointer to string mvid.");
+            }
+            return new FrameInfo
+            {
+                Method = Marshal.PtrToStringAnsi(Method),
+                Mvid = new Guid(mvid),
+                ILOffset = ILOffset
+            };
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

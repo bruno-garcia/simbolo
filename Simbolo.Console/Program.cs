@@ -7,12 +7,6 @@ using Simbolo;
 
 class Program
 {
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void Thrower() => throw new Exception("I throw");
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void DoSomething() => Thrower();
-
     private static void Main(string[] args)
     {
         var symbolicate = args.Any(a => a == "--symbolicate");
@@ -21,17 +15,26 @@ class Program
         var frames = new List<FrameInfo>();
         try
         {
-            DoSomething();
+            TestCase.Start();
         }
         catch (Exception e)
         {
+            var info = Client.GetStackTraceInformation(e);
+            Console.WriteLine(info);
+            
             var path = typeof(Program).Assembly.Location;
             foreach (var frame in new StackTrace(e, true).GetFrames())
             {
+                var method = frame.GetMethod();
+                if (method is null)
+                {
+                    // Log this out?!
+                    continue;
+                }
                 var frameInfo = new FrameInfo
                 {
-                    Mvid = frame.GetMethod().Module.ModuleVersionId,
-                    Method = frame.GetMethod().Name,
+                    Mvid = method.Module.ModuleVersionId,
+                    Method = method.Name,
                     ILOffset = frame.GetILOffset(),
                 };
 

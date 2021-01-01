@@ -41,7 +41,7 @@ namespace Simbolo
             }
             // TODO: Check signature to find overload
 
-            SequencePoint sequencePoint = default;
+            SequencePoint sequencePoint = null!;
             foreach (var sp in method
                 .DebugInformation
                 .SequencePoints
@@ -54,6 +54,10 @@ namespace Simbolo
                 }
             }
 
+            if (sequencePoint is null)
+            {
+                throw new InvalidOperationException("No sequence point was found for offset: " + frame.ILOffset);
+            }
             var location = new Location(
                 sequencePoint.Document.Url,
                 sequencePoint.StartLine,
@@ -85,7 +89,7 @@ namespace Simbolo
     public class FrameInfo
     {
         public Guid Mvid { get; set; }
-        public string Method { get; set; }
+        public string? Method { get; set; }
         public int ILOffset { get; set; }
     }
 }
