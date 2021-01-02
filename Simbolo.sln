@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Simbolo.NativeLib", "Simbol
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Simbolo.Console", "Simbolo.Console\Simbolo.Console.csproj", "{111841B0-3A56-4996-B2EE-72B3EDF7B6BA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Simbolo.Backend", "Simbolo.Backend\Simbolo.Backend.csproj", "{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -58,5 +60,17 @@ Global
 		{111841B0-3A56-4996-B2EE-72B3EDF7B6BA}.Release|x64.Build.0 = Release|Any CPU
 		{111841B0-3A56-4996-B2EE-72B3EDF7B6BA}.Release|x86.ActiveCfg = Release|Any CPU
 		{111841B0-3A56-4996-B2EE-72B3EDF7B6BA}.Release|x86.Build.0 = Release|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Debug|x64.Build.0 = Debug|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Debug|x86.Build.0 = Debug|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Release|x64.ActiveCfg = Release|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Release|x64.Build.0 = Release|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Release|x86.ActiveCfg = Release|Any CPU
+		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

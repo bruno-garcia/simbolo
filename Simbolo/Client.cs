@@ -2,10 +2,14 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 
@@ -23,41 +27,40 @@ namespace Simbolo
 
             var frames = new List<StackFrameInformation>();
             var debugMetas = new List<DebugMeta>();
-            foreach (var stackFrame in stackTrace.GetFrames())
+            if (stackTrace.GetFrames() is { } stackFrames)
             {
-                var frame = GetFrameInformation(stackFrame);
-                frames.Add(frame);
-
-                if (frame.LineNumber == null && GetDebugMeta(stackFrame) is { } debugMeta)
+                foreach (var stackFrame in stackFrames)
                 {
-                    debugMetas.Add(debugMeta);
+                    var frame = GetFrameInformation(stackFrame);
+                    if (frame is not null)
+                    {
+                        frames.Add(frame);
+                        if (frame.LineNumber == null && GetDebugMeta(stackFrame) is { } debugMeta)
+                        {
+                            debugMetas.Add(debugMeta);
+                        }
+                    }
                 }
             }
 
             return new StackTraceInformation(frames, debugMetas);
         }
 
-        private static StackFrameInformation GetFrameInformation(StackFrame stackFrame)
+        private static StackFrameInformation? GetFrameInformation(StackFrame stackFrame)
         {
             if (stackFrame.GetMethod() is not { } method)
             {
-                // TODO: Return what we have, def need debug_meta in this case
-                return new StackFrameInformation();
+                return null;
             }
             
-            var parameterListFormatted = string.Join(
-                ", ",
-                method.GetParameters().Select(p => $"{p.ParameterType.Name} {p.Name}")
-            );
             List<Parameter>? parameters = null;
             foreach (var parameterInfo in method.GetParameters())
             {
                 parameters ??= new List<Parameter>();
-                var param = new Parameter
-                {
-                    TypeName = parameterInfo.ParameterType.Name,
-                    Name = parameterInfo.Name,
-                };
+                var param = new Parameter(
+                    parameterInfo.ParameterType.Name,
+                    parameterInfo.Name);
+
                 parameters.Add(param);
             }
 
@@ -81,23 +84,24 @@ namespace Simbolo
             {
                 columnNumber = null;
             }
-            
-            return new StackFrameInformation
-            {
-                FileName = stackFrame.GetFileName(),
-                MethodIndex = method.MetadataToken,
-                Offset = offset,
-                IsILOffset = isIlOffset,
-                Method = method.Name,
-                Parameters = parameters,
-                LineNumber = lineNumber,
-                ColumnNumber = columnNumber,
-                AssemblyFullName = method.DeclaringType?.Assembly.FullName,
-                TypeFullName = method.DeclaringType?.FullName
-            };
-        }
 
-        private static readonly ConcurrentDictionary<string, DebugMeta> Cache = new();
+            return new StackFrameInformation(
+                method.Name,
+                method.MetadataToken,
+                stackFrame.GetFileName(),
+                offset,
+                method.Module.ModuleVersionId,
+                isIlOffset,
+                null,
+                method.DeclaringType?.Assembly.FullName,
+                method.DeclaringType?.FullName,
+                lineNumber,
+                columnNumber,
+                parameters);
+        }
+    
+
+        private static readonly ConcurrentDictionary<Assembly, Lazy<DebugMeta>> Cache = new();
         private static readonly DebugMeta Empty = new("", Guid.Empty, "", Guid.Empty, 0, null);
 
         private static DebugMeta? GetDebugMeta(StackFrame frame)
@@ -109,34 +113,25 @@ namespace Simbolo
                 // TODO: Logging
                 return null;
             }
-            if (Cache.TryGetValue(location, out var cachedDebugMeta))
-            {
-                return cachedDebugMeta == Empty ? null : cachedDebugMeta;
-            }
 
-            lock (asm!) // We bail if asm or location is null
-            {
-                try
-                {
-                    if (!File.Exists(location))
-                    {
-                        // TODO: Logging
-                        return null;
-                    }
-
-                    using var stream = File.OpenRead(location);
-                    var reader = new PEReader(stream);
-                    var debugMeta = GetDebugMeta(reader);
-                    Cache.TryAdd(location, debugMeta ?? Empty);
-                    return debugMeta;
-                }
-                catch
-                {
-                    Cache.TryAdd(location, Empty);
-                    throw;
-                }
-            }
+            var cachedDebugMeta = Cache.GetOrAdd(asm!, ValueFactory);
+            return cachedDebugMeta.Value == Empty ? null : cachedDebugMeta.Value;
         }
+
+        private static Lazy<DebugMeta> ValueFactory(Assembly asm) =>
+            new(() =>
+            {
+                var location = asm.Location;
+                if (!File.Exists(location))
+                {
+                    return Empty;
+                }
+
+                using var stream = File.OpenRead(location);
+                var reader = new PEReader(stream);
+                var debugMeta = GetDebugMeta(reader);
+                return debugMeta ?? Empty;
+            });
 
         private static DebugMeta? GetDebugMeta(PEReader peReader)
         {
@@ -183,6 +178,64 @@ namespace Simbolo
                 age,
                 checksums);
         }
+        
+        // https://github.com/dotnet/runtime/blob/master/src/libraries/System.Private.CoreLib/src/System/Diagnostics/StackTrace.cs#L375-L430
+        private static bool TryResolveStateMachineMethod(ref MethodBase method, [NotNullWhen(true)] out Type declaringType)
+        {
+            if (method.DeclaringType is null)
+            {
+                declaringType = null!;
+                return false;
+            }
+            declaringType = method.DeclaringType;
+
+            var parentType = declaringType.DeclaringType;
+            if (parentType is null)
+            {
+                return false;
+            }
+
+            static MethodInfo[]? GetDeclaredMethods(Type type) =>
+                type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+
+            var methods = GetDeclaredMethods(parentType);
+            if (methods == null)
+            {
+                return false;
+            }
+
+            foreach (MethodInfo candidateMethod in methods)
+            {
+                var attributes = candidateMethod.GetCustomAttributes<StateMachineAttribute>(inherit: false);
+                // ReSharper disable once ConditionIsAlwaysTrueOrFalse - Taken from CoreFX
+                if (attributes is null)
+                {
+                    continue;
+                }
+
+                bool foundAttribute = false, foundIteratorAttribute = false;
+                foreach (StateMachineAttribute asma in attributes)
+                {
+                    if (asma.StateMachineType == declaringType)
+                    {
+                        foundAttribute = true;
+                        foundIteratorAttribute |= asma is IteratorStateMachineAttribute || asma is AsyncIteratorStateMachineAttribute;
+                    }
+                }
+
+                if (foundAttribute)
+                {
+                    // If this is an iterator (sync or async), mark the iterator as changed, so it gets the + annotation
+                    // of the original method. Non-iterator async state machines resolve directly to their builder methods
+                    // so aren't marked as changed.
+                    method = candidateMethod;
+                    declaringType = candidateMethod.DeclaringType!;
+                    return foundIteratorAttribute;
+                }
+            }
+
+            return false;
+        }
     }
 
     public class StackTraceInformation
@@ -215,7 +268,7 @@ namespace Simbolo
 
         private string ToStringDotnet()
         {
-            var builder = new StringBuilder();
+            var builder = new StringBuilder(256);
             foreach (var info in StackFrameInformation)
             {
                 if (info.Method is null)
@@ -224,6 +277,7 @@ namespace Simbolo
                 }
 
                 builder.Append("   at ");
+                
                 if (info.TypeFullName is not null)
                 {
                     builder.Append(info.TypeFullName);
@@ -237,8 +291,15 @@ namespace Simbolo
                 else
                 {
                     builder.Append('(');
+                    var first = true;
                     foreach (var arg in info.Parameters)
                     {
+                        if (!first)
+                        {
+                            builder.Append(", ");
+                        }
+
+                        first = false;
                         builder.Append(arg.TypeName);
                         builder.Append(' ');
                         builder.Append(arg.Name);
@@ -255,7 +316,7 @@ namespace Simbolo
                     builder.Append(" in ");
                     // Mono format
                     builder.Append('<');
-                    builder.Append(info.FileName);
+                    builder.AppendFormat(CultureInfo.InvariantCulture, "{0:n}", info.Mvid.Value);
                     if (info.Aotid is not null)
                     {
                         builder.Append('#');
@@ -285,18 +346,46 @@ namespace Simbolo
 
     public class StackFrameInformation
     {
-        public int? MethodIndex { get; init; }
-        public int? Offset { get; init; }
-        public bool? IsILOffset { get; init; }
-        public string? Mvid { get; init; }
-        public string? Aotid { get; init; }
-        public string? FileName { get; init; }
-        public string? Method { get; init; }
-        public string? AssemblyFullName { get; init; }
-        public string? TypeFullName { get; init; }
-        public int? LineNumber { get; init; }
-        public int? ColumnNumber { get; init; }
-        public IEnumerable<Parameter>? Parameters { get; init; }
+        public int? MethodIndex { get; }
+        public int? Offset { get; }
+        public bool? IsILOffset { get; }
+        public Guid? Mvid { get; }
+        public string? Aotid { get; }
+        public string? FileName { get; }
+        public string? Method { get; }
+        public string? AssemblyFullName { get; }
+        public string? TypeFullName { get; }
+        public int? LineNumber { get; }
+        public int? ColumnNumber { get; }
+        public IEnumerable<Parameter>? Parameters { get; }
+
+        public StackFrameInformation(
+            string? method,
+            int? methodIndex,
+            string? fileName,
+            int? offset,
+            Guid? mvid,
+            bool? isIlOffset,
+            string? aotid,
+            string? assemblyFullName,
+            string? typeFullName,
+            int? lineNumber,
+            int? columnNumber,
+            IEnumerable<Parameter>? parameters)
+        {
+            MethodIndex = methodIndex;
+            Offset = offset;
+            IsILOffset = isIlOffset;
+            Mvid = mvid;
+            Aotid = aotid;
+            FileName = fileName;
+            Method = method;
+            AssemblyFullName = assemblyFullName;
+            TypeFullName = typeFullName;
+            LineNumber = lineNumber;
+            ColumnNumber = columnNumber;
+            Parameters = parameters;
+        }
 
         public override string ToString() =>
             $"{nameof(MethodIndex)}: {MethodIndex}, " +
@@ -312,11 +401,17 @@ namespace Simbolo
             $"{nameof(ColumnNumber)}: {ColumnNumber}, " +
             $"{nameof(Parameters)}: {string.Join(", ", Parameters ?? Enumerable.Empty<Parameter>())}";
     }
-
+    
     public class Parameter
     {
-        public string? TypeName { get; init; }
-        public string? Name { get; init; }
+        public string? TypeName { get; }
+        public string? Name { get; }
+
+        public Parameter(string? typeName, string? name)
+        {
+            TypeName = typeName;
+            Name = name;
+        }
     }
     public class DebugMeta
     {
@@ -336,7 +431,7 @@ namespace Simbolo
         public string Type { get; }
         public Guid Guid { get; }
         public int Age { get; }
-        public IEnumerable<string>? Checksums { get; init; }
+        public IEnumerable<string>? Checksums { get; }
 
         public override string ToString() =>
             $"{nameof(File)}: {File}, " +
