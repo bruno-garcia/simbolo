@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Simbolo.Console", "Simbolo.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Simbolo.Backend", "Simbolo.Backend\Simbolo.Backend.csproj", "{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Simbolo.Tests", "Simbolo.Tests\Simbolo.Tests.csproj", "{98EF5945-CA84-493F-A067-750262F49E3F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -72,5 +74,17 @@ Global
 		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Release|x64.Build.0 = Release|Any CPU
 		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Release|x86.ActiveCfg = Release|Any CPU
 		{39C9C93A-AB10-4B4B-93C4-5C7655A764F8}.Release|x86.Build.0 = Release|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Debug|x64.Build.0 = Debug|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Debug|x86.Build.0 = Debug|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Release|x64.ActiveCfg = Release|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Release|x64.Build.0 = Release|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Release|x86.ActiveCfg = Release|Any CPU
+		{98EF5945-CA84-493F-A067-750262F49E3F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

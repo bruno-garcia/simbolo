@@ -5,7 +5,7 @@ using Mono.Cecil;
 using Mono.Cecil.Pdb;
 using SequencePoint = Mono.Cecil.Cil.SequencePoint;
 
-namespace Simbolo
+namespace Simbolo.Backend
 {
     public static class Symbolicate
     {

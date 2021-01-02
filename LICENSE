@@ -1,0 +1,28 @@
+MIT License
+
+Copyright (c) 2020 Bruno Garcia
+
+Copyright (c) .NET Foundation and Contributors (classes taken from CoreFX and modified)
+MIT license at: https://github.com/dotnet/runtime/blob/2eb9d838966629fff4cb03b13050692709195bd1/LICENSE.TXT
+
+Copyright (c) 2021 Ben Adams (extensive parts of Ben.Demystifier copied and modified)
+Ben.Demistifier is Licensed as Apache 2:
+https://github.com/benaadams/Ben.Demystifier/blob/87375e9013db462ad5af21bc308bc73c63cfe919/LICENSE
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
