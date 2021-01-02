@@ -24,24 +24,25 @@ namespace Simbolo
         public static class ProblematicClass
         {
             public static void Throw1(Data data, int i, ref long j, string s, IEnumerable<string> ss) => TestCase.CallWithGeneric(data);
-        }
-    }
-}
+            
         
-public readonly struct Data : IThrow
-{
-    public Data(int val)
-    {
-        Val = val;
-    }
+            public readonly struct Data : IThrow
+            {
+                public Data(int val)
+                {
+                    Val = val;
+                }
 
-    public int Val { get; }
+                public int Val { get; }
 
-    public void Throw()
-    {
-        var tmpThis = this;
-        var task = Task.Run(() =>
-            throw new InvalidOperationException($"I don't like {tmpThis.Val}"));
-        task.Wait();
+                public void Throw()
+                {
+                    var tmpThis = this;
+                    var task = Task.Run(() =>
+                        throw new InvalidOperationException($"I don't like {tmpThis.Val}"));
+                    task.Wait();
+                }
+            }
+        }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -53,15 +54,18 @@ namespace Simbolo
                 return null;
             }
             
-            List<Parameter>? parameters = null;
-            foreach (var parameterInfo in method.GetParameters())
+            // https://github.com/dotnet/runtime/blob/c985bdcec2a9190e733bcada413a193d5ff60c0d/src/libraries/System.Private.CoreLib/src/System/Diagnostics/StackTrace.cs#L225-L249
+            var isAsync = false;
+            var declaringType = method.DeclaringType;
+            string originalMethodName = method.Name;
+            var methodChanged = false;
+            if (declaringType != null && declaringType.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false))
             {
-                parameters ??= new List<Parameter>();
-                var param = new Parameter(
-                    parameterInfo.ParameterType.Name,
-                    parameterInfo.Name);
-
-                parameters.Add(param);
+                isAsync = typeof(IAsyncStateMachine).IsAssignableFrom(declaringType);
+                if (isAsync || typeof(IEnumerator).IsAssignableFrom(declaringType))
+                {
+                    methodChanged = TryResolveStateMachineMethod(ref method, out declaringType);
+                }
             }
 
             // stackFrame.HasILOffset() throws NotImplemented on Mono 5.12
@@ -84,22 +88,53 @@ namespace Simbolo
             {
                 columnNumber = null;
             }
+            
+            var methodName = method.Name;
+            if (methodChanged)
+            {
+                // Append original method name e.g. +MoveNext()
+                methodName = $"{methodName}+{originalMethodName}()";
+            }
+            
+            List<Parameter>? parameters = null;
+            try
+            {
+                foreach (var parameterInfo in method.GetParameters())
+                {
+                    parameters ??= new List<Parameter>();
+                    var param = new Parameter(
+                        parameterInfo.ParameterType.Name,
+                        parameterInfo.Name);
+                    parameters.Add(param);
+                }
+            }
+            catch
+            {
+                // Can fail to GetParameters()
+                // https://github.com/dotnet/runtime/blob/c985bdcec2a9190e733bcada413a193d5ff60c0d/src/libraries/System.Private.CoreLib/src/System/Diagnostics/StackTrace.cs#L274-L282
+            }
+
+            IEnumerable<string>? genericArguments = null;
+            if (method.GetGenericArguments() is {Length: > 0} genArgs)
+            {
+                genericArguments = genArgs.Select(t => t.Name).ToArray();
+            }
 
             return new StackFrameInformation(
-                method.Name,
+                methodName,
                 method.MetadataToken,
                 stackFrame.GetFileName(),
                 offset,
                 method.Module.ModuleVersionId,
                 isIlOffset,
                 null,
-                method.DeclaringType?.Assembly.FullName,
-                method.DeclaringType?.FullName,
+                declaringType?.Assembly.FullName,
+                declaringType?.FullName?.Replace("+", "."),
                 lineNumber,
                 columnNumber,
-                parameters);
+                parameters,
+                genericArguments);
         }
-    
 
         private static readonly ConcurrentDictionary<Assembly, Lazy<DebugMeta>> Cache = new();
         private static readonly DebugMeta Empty = new("", Guid.Empty, "", Guid.Empty, 0, null);
@@ -179,7 +214,7 @@ namespace Simbolo
                 checksums);
         }
         
-        // https://github.com/dotnet/runtime/blob/master/src/libraries/System.Private.CoreLib/src/System/Diagnostics/StackTrace.cs#L375-L430
+        // https://github.com/dotnet/runtime/blob/c985bdcec2a9190e733bcada413a193d5ff60c0d/src/libraries/System.Private.CoreLib/src/System/Diagnostics/StackTrace.cs#L375-L430
         private static bool TryResolveStateMachineMethod(ref MethodBase method, [NotNullWhen(true)] out Type declaringType)
         {
             if (method.DeclaringType is null)
@@ -284,6 +319,25 @@ namespace Simbolo
                     builder.Append('.');
                 } 
                 builder.Append(info.Method);
+                // deal with the generic portion of the method
+                if (info.GenericArguments?.ToArray() is {Length: >0} genericArguments)
+                {
+                    builder.Append('[');
+                    var firstGenericArg = true;
+                    foreach (var genericArgument in genericArguments)
+                    {
+                        if (firstGenericArg)
+                        {
+                            firstGenericArg = false;
+                        }
+                        else
+                        {
+                            builder.Append(',');
+                        }
+                        builder.Append(genericArgument);
+                    }
+                    builder.Append(']');
+                }
                 if (info.Parameters is null || !info.Parameters.Any())
                 {
                     builder.Append("()");
@@ -358,6 +412,7 @@ namespace Simbolo
         public int? LineNumber { get; }
         public int? ColumnNumber { get; }
         public IEnumerable<Parameter>? Parameters { get; }
+        public IEnumerable<string>? GenericArguments { get; }
 
         public StackFrameInformation(
             string? method,
@@ -371,7 +426,8 @@ namespace Simbolo
             string? typeFullName,
             int? lineNumber,
             int? columnNumber,
-            IEnumerable<Parameter>? parameters)
+            IEnumerable<Parameter>? parameters,
+            IEnumerable<string>? genericArguments)
         {
             MethodIndex = methodIndex;
             Offset = offset;
@@ -385,6 +441,7 @@ namespace Simbolo
             LineNumber = lineNumber;
             ColumnNumber = columnNumber;
             Parameters = parameters;
+            GenericArguments = genericArguments;
         }
 
         public override string ToString() =>
@@ -399,6 +456,7 @@ namespace Simbolo
             $"{nameof(TypeFullName)}: {TypeFullName}, " +
             $"{nameof(LineNumber)}: {LineNumber}, " +
             $"{nameof(ColumnNumber)}: {ColumnNumber}, " +
+            $"{nameof(GenericArguments)}: {string.Join(", ", GenericArguments ?? Enumerable.Empty<string>())}" + 
             $"{nameof(Parameters)}: {string.Join(", ", Parameters ?? Enumerable.Empty<Parameter>())}";
     }
     
