@@ -29,17 +29,15 @@ namespace Simbolo.Backend
             var newFrames = new List<StackFrameInformation>();
             foreach (var stackFrameInformation in info.StackFrameInformation)
             {
-                if (stackFrameInformation.LineNumber is not null)
+                if (stackFrameInformation.LineNumber is null 
+                    && stackFrameInformation.Mvid.HasValue &&
+                    info.DebugMetas.TryGetValue(stackFrameInformation.Mvid.Value, out var debugMeta))
                 {
-                    newFrames.Add(stackFrameInformation);
-                }
+                    newFrames.Add(Symbolicate(stackFrameInformation, debugMeta));
+                } 
                 else
                 {
-                    var debugMeta = info.DebugMetas.FirstOrDefault(d => d.ModuleId == stackFrameInformation.Mvid);
-                    newFrames.Add(debugMeta is null
-                        ? stackFrameInformation
-                        // Symbolicate if there's no line number and debug meta is available
-                        : Symbolicate(stackFrameInformation, debugMeta));    
+                    newFrames.Add(stackFrameInformation);    
                 }
             }
 

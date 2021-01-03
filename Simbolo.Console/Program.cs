@@ -10,8 +10,6 @@ class Program
 {
     private static void Main(string[] args)
     {
-        
-        File.Move(Path.Combine(Directory.GetCurrentDirectory(), "Simbolo.pdb"), "simbolo123123.nope", true);
         var symbolicate = args.Any(a => a == "--symbolicate");
         var verbose = args.Any(a => a == "--verbose");
         var raw = args.Any(a => a == "--raw");

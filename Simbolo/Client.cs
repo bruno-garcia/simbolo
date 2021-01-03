@@ -42,7 +42,7 @@ namespace Simbolo
                 }
             }
 
-            return new StackTraceInformation(frames, debugMetas.Values);
+            return new StackTraceInformation(frames, debugMetas);
         }
 
         private static StackFrameInformation? GetFrameInformation(EnhancedStackFrame stackFrame)

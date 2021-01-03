@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -9,11 +10,11 @@ namespace Simbolo.StackFrameData
     public class StackTraceInformation
     {
         public IEnumerable<StackFrameInformation> StackFrameInformation { get; }
-        public IEnumerable<DebugMeta> DebugMetas { get; }
+        public IDictionary<Guid, DebugMeta> DebugMetas { get; }
 
         public StackTraceInformation(
             IEnumerable<StackFrameInformation> stackFrameInformation,
-            IEnumerable<DebugMeta> debugMetas)
+            IDictionary<Guid, DebugMeta> debugMetas)
         {
             StackFrameInformation = stackFrameInformation;
             DebugMetas = debugMetas;
@@ -22,7 +23,7 @@ namespace Simbolo.StackFrameData
         internal StackTraceInformation()
         {
             StackFrameInformation = Enumerable.Empty<StackFrameInformation>();
-            DebugMetas = Enumerable.Empty<DebugMeta>();
+            DebugMetas = new Dictionary<Guid, DebugMeta>(0);
         }
 
         public override string ToString() => ToString("default");
