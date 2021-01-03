@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
+<!--        <DebugType>none</DebugType>-->
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="System.Text.Json" Version="5.0.0" />

@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using Simbolo;
 using Simbolo.Backend;
 
@@ -10,13 +10,15 @@ class Program
 {
     private static void Main(string[] args)
     {
+        
+        File.Move(Path.Combine(Directory.GetCurrentDirectory(), "Simbolo.pdb"), "simbolo123123.nope", true);
         var symbolicate = args.Any(a => a == "--symbolicate");
         var verbose = args.Any(a => a == "--verbose");
         var raw = args.Any(a => a == "--raw");
         var frames = new List<FrameInfo>();
         try
         {
-            TestCase.Start();
+            _ = new Example();
         }
         catch (Exception e)
         {
@@ -25,7 +27,16 @@ class Program
             Console.WriteLine(info.ToString());
             Console.WriteLine("Original:");
             Console.WriteLine(e.StackTrace);
-            
+
+            using var symbolicateStackTrace = new SymbolicateStackTrace(new SymbolicateOptions
+            {
+                SymbolsPath = "."
+            });
+
+            var symbolicated = symbolicateStackTrace.Symbolicate(info);
+            Console.WriteLine("Symbolicated:");
+            Console.WriteLine(symbolicated.ToString());
+
             var path = typeof(Program).Assembly.Location;
             foreach (var frame in new StackTrace(e, true).GetFrames())
             {

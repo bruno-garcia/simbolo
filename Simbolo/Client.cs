@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -28,21 +27,22 @@ namespace Simbolo
             var enhancedStackTrace = EnhancedStackTrace.GetFrames(exception);
             
             var frames = new List<StackFrameInformation>();
-            var debugMetas = new List<DebugMeta>();
+            var debugMetas = new Dictionary<Guid, DebugMeta>();
             foreach (var stackFrame in enhancedStackTrace)
             {
                 var frame = GetFrameInformation(stackFrame);
                 if (frame is not null)
                 {
                     frames.Add(frame);
-                    if (frame.LineNumber == null && GetDebugMeta(stackFrame) is { } debugMeta)
+                    if (frame.LineNumber == null && GetDebugMeta(stackFrame) is { } debugMeta 
+                                                 && !debugMetas.ContainsKey(debugMeta.ModuleId))
                     {
-                        debugMetas.Add(debugMeta);
+                        debugMetas[debugMeta.ModuleId] = debugMeta;
                     }
                 }
             }
 
-            return new StackTraceInformation(frames, debugMetas);
+            return new StackTraceInformation(frames, debugMetas.Values);
         }
 
         private static StackFrameInformation? GetFrameInformation(EnhancedStackFrame stackFrame)

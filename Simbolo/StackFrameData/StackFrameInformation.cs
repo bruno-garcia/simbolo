@@ -2,7 +2,7 @@ using System;
 
 namespace Simbolo.StackFrameData
 {
-    public class StackFrameInformation
+    public record StackFrameInformation
     {
         public int? MethodIndex { get; }
         public int? Offset { get; }

@@ -9,6 +9,13 @@ Copyright (c) 2021 Ben Adams (extensive parts of Ben.Demystifier copied and modi
 Ben.Demistifier is Licensed as Apache 2:
 https://github.com/benaadams/Ben.Demystifier/blob/87375e9013db462ad5af21bc308bc73c63cfe919/LICENSE
 
+Copyright (c) 2018 Sentry (Code taken from the Sentry SDK)
+MIT license: https://github.com/getsentry/sentry-dotnet/blob/main/LICENSE
+
+Mono Project
+License: https://github.com/mono/mono/blob/95a9518b73b686fbe78a73a8393da787e45224e9/LICENSE
+Code taken from: Mono symbolicate https://github.com/mono/mono/tree/master/mcs/tools/mono-symbolicate 
+
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
