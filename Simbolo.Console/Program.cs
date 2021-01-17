@@ -20,20 +20,20 @@ class Program
         }
         catch (Exception e)
         {
-            var info = Client.GetStackTraceInformation(e);
-            Console.WriteLine("Custom:");
-            Console.WriteLine(info.ToString());
-            Console.WriteLine("Original:");
-            Console.WriteLine(e.StackTrace);
-
-            using var symbolicateStackTrace = new SymbolicateStackTrace(new SymbolicateOptions
-            {
-                SymbolsPath = "."
-            });
-
-            var symbolicated = symbolicateStackTrace.Symbolicate(info);
-            Console.WriteLine("Symbolicated:");
-            Console.WriteLine(symbolicated.ToString());
+            // var info = Client.GetStackTraceInformation(e);
+            // Console.WriteLine("Custom:");
+            // Console.WriteLine(info.ToString());
+            // Console.WriteLine("Original:");
+            // Console.WriteLine(e.StackTrace);
+            //
+            // using var symbolicateStackTrace = new SymbolicateStackTrace(new SymbolicateOptions
+            // {
+            //     SymbolsPath = "."
+            // });
+            //
+            // var symbolicated = symbolicateStackTrace.Symbolicate(info);
+            // Console.WriteLine("Symbolicated:");
+            // Console.WriteLine(symbolicated.ToString());
 
             var path = typeof(Program).Assembly.Location;
             foreach (var frame in new StackTrace(e, true).GetFrames())

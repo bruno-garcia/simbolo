@@ -14,6 +14,10 @@ namespace Simbolo.Backend
     public class SymbolicateOptions
     {
         public string? SymbolsPath { get; set; }
+        // TODO:
+        // Lookup directories could be a bitwise enum (use symbols path, append mvid, etc)
+
+        // Running on a server we don't want this turned on
         public bool AttemptOriginalSymbolPath { get; set; } = true;
     }
 
@@ -24,24 +28,22 @@ namespace Simbolo.Backend
 
         public SymbolicateStackTrace(SymbolicateOptions options) => _options = options;
 
-        public StackTraceInformation Symbolicate(StackTraceInformation info)
+        public void Symbolicate(StackTraceInformation info)
         {
-            var newFrames = new List<StackFrameInformation>();
-            foreach (var stackFrameInformation in info.StackFrameInformation)
+            for (int i = 0; i < info.StackFrameInformation.Count; i++)
             {
+                var stackFrameInformation = info.StackFrameInformation[i];
                 if (stackFrameInformation.LineNumber is null 
                     && stackFrameInformation.Mvid.HasValue &&
                     info.DebugMetas.TryGetValue(stackFrameInformation.Mvid.Value, out var debugMeta))
                 {
-                    newFrames.Add(Symbolicate(stackFrameInformation, debugMeta));
+                    info.StackFrameInformation[i] = Symbolicate(stackFrameInformation, debugMeta);
                 } 
                 else
                 {
-                    newFrames.Add(stackFrameInformation);    
+                    info.StackFrameInformation[i] = stackFrameInformation;    
                 }
             }
-
-            return new StackTraceInformation(newFrames, info.DebugMetas);
         }
 
         public StackFrameInformation Symbolicate(StackFrameInformation stackFrame, DebugMeta debugMeta)
@@ -69,9 +71,17 @@ namespace Simbolo.Backend
             {
                 if (_options.SymbolsPath is { } path)
                 {
+                    // File under a folder named after the mvid
                     yield return Path.Combine(
                         path,
+                        // mono builds moves the pdb/dll under a folder named with the mvid
                         debugMeta.ModuleId.ToString("n"),
+                        Path.ChangeExtension(Path.GetFileName(debugMeta.File),
+                            "pdb"));
+
+                    // File directly in the symbols path
+                    yield return Path.Combine(
+                        path,
                         Path.ChangeExtension(Path.GetFileName(debugMeta.File),
                             "pdb"));
                 }

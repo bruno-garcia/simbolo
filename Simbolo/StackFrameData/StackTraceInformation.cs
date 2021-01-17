@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 using System.Text.Json;
 
@@ -9,11 +8,11 @@ namespace Simbolo.StackFrameData
 {
     public class StackTraceInformation
     {
-        public IEnumerable<StackFrameInformation> StackFrameInformation { get; }
+        public IList<StackFrameInformation> StackFrameInformation { get; }
         public IDictionary<Guid, DebugMeta> DebugMetas { get; }
 
         public StackTraceInformation(
-            IEnumerable<StackFrameInformation> stackFrameInformation,
+            IList<StackFrameInformation> stackFrameInformation,
             IDictionary<Guid, DebugMeta> debugMetas)
         {
             StackFrameInformation = stackFrameInformation;
@@ -22,7 +21,7 @@ namespace Simbolo.StackFrameData
         
         internal StackTraceInformation()
         {
-            StackFrameInformation = Enumerable.Empty<StackFrameInformation>();
+            StackFrameInformation = new List<StackFrameInformation>();
             DebugMetas = new Dictionary<Guid, DebugMeta>(0);
         }
 
