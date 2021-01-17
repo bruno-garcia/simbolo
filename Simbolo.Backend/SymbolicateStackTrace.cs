@@ -41,7 +41,7 @@ namespace Simbolo.Backend
                 } 
                 else
                 {
-                    info.StackFrameInformation[i] = stackFrameInformation;    
+                    info.StackFrameInformation[i] = stackFrameInformation;
                 }
             }
         }
@@ -69,26 +69,26 @@ namespace Simbolo.Backend
 
             IEnumerable<string> GetProbingPaths()
             {
+                var file = Path.ChangeExtension(debugMeta.File, "pdb");
+
                 if (_options.SymbolsPath is { } path)
                 {
+                    var fileName = Path.GetFileName(file);
+
                     // File under a folder named after the mvid
                     yield return Path.Combine(
                         path,
                         // mono builds moves the pdb/dll under a folder named with the mvid
                         debugMeta.ModuleId.ToString("n"),
-                        Path.ChangeExtension(Path.GetFileName(debugMeta.File),
-                            "pdb"));
+                        fileName);
 
                     // File directly in the symbols path
-                    yield return Path.Combine(
-                        path,
-                        Path.ChangeExtension(Path.GetFileName(debugMeta.File),
-                            "pdb"));
+                    yield return Path.Combine(path, fileName);
                 }
 
                 if (_options.AttemptOriginalSymbolPath)
                 {
-                    yield return debugMeta.File;
+                    yield return file;
                 }
             }
 
@@ -98,6 +98,7 @@ namespace Simbolo.Backend
                 {
                     try
                     {
+                        Console.WriteLine("probingPath: " + probingPath);
                         return File.OpenRead(probingPath);
                     }
                     catch// (Exception e)
@@ -110,6 +111,7 @@ namespace Simbolo.Backend
                 var fileStream = SafeGetFileStream();
                 if (fileStream is not null)
                 {
+                    Console.WriteLine("Opening file at: " + ((FileStream) fileStream).Name);
                     var provider = MetadataReaderProvider.FromPortablePdbStream(fileStream);
                     var reader = provider.GetMetadataReader();
                     // Standalone debug metadata image doesn't contain Module table.
