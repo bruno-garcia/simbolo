@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+#set -e
 
 dotnet run -p ../Simbolo.Console/Simbolo.Console.csproj --raw > raw_frames.txt
 
