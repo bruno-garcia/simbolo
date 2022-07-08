@@ -161,7 +161,10 @@ namespace Simbolo.Backend
         {
             var methodToken = MetadataTokens.Handle(token);
 
-            Debug.Assert(methodToken.Kind == HandleKind.MethodDefinition);
+            if (methodToken.Kind != HandleKind.MethodDefinition)
+            {
+                return null;
+            }
 
             var handle = ((MethodDefinitionHandle)methodToken).ToDebugInformationHandle();
             
