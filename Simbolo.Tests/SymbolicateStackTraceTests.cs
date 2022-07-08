@@ -36,7 +36,7 @@ namespace Simbolo.Tests
             {
                 info = Client.GetStackTraceInformation(e);
             }
-            
+
             // The Simbolo.dll frames and also System.Private.CoreLib.pdb
             // Test lib isn't listed because line numbers are already available (pdb was found)
             Assert.Equal(2, info.DebugMetas.Count);
@@ -56,9 +56,9 @@ namespace Simbolo.Tests
                 && i.LineNumber is not null
                 && i.ColumnNumber is not null
                 && i.FileName is not null));
-            
+
             // Symbolicate the frames:
-            
+
             // Test symbolication
             _fixture.Options.SymbolsPath = pdbPath;
 
@@ -70,7 +70,7 @@ namespace Simbolo.Tests
             sut.Symbolicate(info);
 
             var simboloFrames = info.StackFrameInformation.Where(f => f.Mvid == simbolo.Key).ToArray();
-            // number of frames will change only if Example.cs changes 
+            // number of frames will change only if Example.cs changes
             const int exampleFrames = 24;
             Assert.Equal(exampleFrames, simboloFrames.Length);
             Assert.Equal(exampleFrames, simboloFrames.Count(f => f.LineNumber is not null));
